@@ -30,6 +30,7 @@ $ ./manage.py --version && ./manage.py makemigrations app
 Migrations for 'app':
   app/migrations/0001_initial.py
     - Create model Blog
+```
 
 Relevant part of the migration (containing the index, but with the manual name):
 ```python
@@ -85,3 +86,17 @@ Migrations for 'app':
 the django generated index name is set when [`index.set_name_with_model(model)` is called in `ModelState`](https://github.com/django/django/blob/1.11/django/db/migrations/state.py#L466).
 
 Django 1.11.1 added a backport from [PR #8328](https://github.com/django/django/pull/8328) which checks if index.name is defined, so we should expect this behaviour. Omitting the `name` argument is not possible, because apparently, `index.set_name_with_model()` is not called on the elements added to `Model._meta.indexes` from `contribute_to_class`.
+
+
+When I omit the `name` argument from `GinIndex()`, I get:
+
+```
+$ ./manage.py --version && ./manage.py makemigrations app
+1.11
+[... stack trace ...]
+ValueError: Indexes passed to AddIndex operations require a name argument. <GinIndex: fields='json'> doesn't have one.
+```
+
+Results for 1.11.8 and 2.0 are the same.
+
+Ideally, I want to rely on Django to generate the name.

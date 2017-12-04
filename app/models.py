@@ -13,7 +13,8 @@ class CustomJSONField(JSONField):
         # print('\n\n', type(name), name)
         # traceback.print_stack()
 
-        cls._meta.indexes.append(GinIndex(fields=[name], name='manual_name_{}_gin'.format(cls._meta.db_table)))
+        cls._meta.indexes.append(GinIndex(fields=[name]))
+        # cls._meta.indexes.append(GinIndex(fields=[name]), name='manual_name_{}_gin'.format(cls._meta.db_table)))
 
         super(CustomJSONField, self).contribute_to_class(cls, name)
 

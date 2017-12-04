@@ -32,9 +32,8 @@ Migrations for 'app':
     - Create model Blog
 ```
 
-Relevant part of the migration (containing the index, but with the manual name):
+Note that the indexes are added in the migration, but not mentioned in the output. Relevant part of the migration (containing the index, but with the manual name):
 ```python
-
     migrations.CreateModel(
         name='Blog',
         fields=[

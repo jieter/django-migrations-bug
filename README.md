@@ -93,7 +93,7 @@ That's why I do it manually from `contribute_to_class`
 
 
 # related issues/comments
-
  - https://code.djangoproject.com/ticket/27738
 [Markus Holtermann](https://code.djangoproject.com/ticket/27738#comment:4)
 > name is supposed to be a required argument when you define an index in `_meta.indexes`. However, for backwards compatibility reasons with auto-generated index names for e.g. db_index=True and index_together the name cannot be set during object creation but needs to be patched in later while running migrations.
+ - Django ticket created as a result of this tinkering: [Index added to _meta.indexes with Meta.indexes=[] yields two equal addIndex() operations.](https://code.djangoproject.com/ticket/28888)

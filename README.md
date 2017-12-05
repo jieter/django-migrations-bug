@@ -8,11 +8,12 @@ When I strip down that field, this is what's left:
 
 ```python
 class CustomJSONField(JSONField):
-
     def contribute_to_class(self, cls, name):
-        cls._meta.indexes.append(GinIndex(fields=[name], name='manual_name_{}_gin'.format(cls._meta.db_table)))
-
         super(CustomJSONField, self).contribute_to_class(cls, name)
+
+        index = GinIndex(fields=[name])
+        index.set_name_with_model(cls)
+        cls._meta.indexes.append(index)
 ```
 
 When add a new model:
@@ -25,15 +26,19 @@ class Blog(models.Model):
 ```
 
 ```
-$ ./manage.py --version && ./manage.py makemigrations app
+./manage.py --version
 1.11.8
+./manage.py makemigrations app
 Migrations for 'app':
   app/migrations/0001_initial.py
     - Create model Blog
+    - Create index app_blog_json_2cf556_gin on field(s) json of model blog
 ```
 
-Note that the indexes are added in the migration, but not mentioned in the output. Relevant part of the migration (containing the index, but with the manual name):
+This is like expected, `operations` list from `migrations/0001_initial.py`:
+
 ```python
+operations = [
     migrations.CreateModel(
         name='Blog',
         fields=[
@@ -44,8 +49,9 @@ Note that the indexes are added in the migration, but not mentioned in the outpu
     ),
     migrations.AddIndex(
         model_name='blog',
-        index=django.contrib.postgres.indexes.GinIndex(fields=['json'], name=b'manual_name_app_blog_gin'),
+        index=django.contrib.postgres.indexes.GinIndex(fields=['json'], name='app_blog_json_2cf556_gin'),
     ),
+]
 ```
 
 Then, when I add `class Meta: indexes = []`:
@@ -60,42 +66,34 @@ class Blog(models.Model):
         indexes = []
 ```
 
-For django 1.11:
 ```
-$ ./manage.py --version && ./manage.py makemigrations app
-1.11
+rm -rf app/migrations
+pip install django==1.11.8
+./manage.py --version
+1.11.8
+./manage.py makemigrations app
 Migrations for 'app':
   app/migrations/0001_initial.py
     - Create model Blog
     - Create index app_blog_json_2cf556_gin on field(s) json of model blog
-    - Create index manual_name_app_blog_gin on field(s) json of model blog
+    - Create index app_blog_json_2cf556_gin on field(s) json of model blog
 ```
 
-For django 1.11.8:
-```
-$ ./manage.py --version && ./manage.py makemigrations app
-1.11.8
-Migrations for 'app':
-  app/migrations/0001_initial.py
-    - Create model Blog
-    - Create index manual_name_app_blog_gin on field(s) json of model blog
-    - Create index manual_name_app_blog_gin on field(s) json of model blog
-```
+The index is added twice (with the same name, resulting in `django.db.utils.ProgrammingError: relation "app_blog_json_2cf556_gin" already exists`).
 
-the django generated index name is set when [`index.set_name_with_model(model)` is called in `ModelState`](https://github.com/django/django/blob/1.11/django/db/migrations/state.py#L466).
-
-Django 1.11.1 added a backport from [PR #8328](https://github.com/django/django/pull/8328) which checks if index.name is defined, so we should expect this behaviour. Omitting the `name` argument is not possible, because apparently, `index.set_name_with_model()` is not called on the elements added to `Model._meta.indexes` from `contribute_to_class`.
+If I add `class Meta: indexes = []` after the initial migration in done, no changes are detected.
 
 
-When I omit the `name` argument from `GinIndex()`, I get:
+## When names are created
 
-```
-$ ./manage.py --version && ./manage.py makemigrations app
-1.11
-[... stack trace ...]
-ValueError: Indexes passed to AddIndex operations require a name argument. <GinIndex: fields='json'> doesn't have one.
-```
+The django generated index name is set when [`index.set_name_with_model(model)` is called in `ModelState`](https://github.com/django/django/blob/1.11/django/db/migrations/state.py#L466).
 
-Results for 1.11.8 and 2.0 are the same.
+Omitting the `name` argument is not possible, because apparently, `index.set_name_with_model()` is not called on the elements added to `Model._meta.indexes` from `contribute_to_class`.
+That's why I do it manually from `contribute_to_class`
 
-Ideally, I want to rely on Django to generate the name.
+
+# related issues/comments
+
+ - https://code.djangoproject.com/ticket/27738
+[Markus Holtermann](https://code.djangoproject.com/ticket/27738#comment:4)
+> name is supposed to be a required argument when you define an index in `_meta.indexes`. However, for backwards compatibility reasons with auto-generated index names for e.g. db_index=True and index_together the name cannot be set during object creation but needs to be patched in later while running migrations.
